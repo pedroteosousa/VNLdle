@@ -405,6 +405,118 @@
   display: none;
 }
 
+/* ── Country filter ── */
+
+.country-filter {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.country-toggle {
+  padding: 7px 16px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.country-toggle:hover {
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.country-panel {
+  width: 100%;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.country-locked-msg {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.country-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.country-actions button {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.country-actions button:hover {
+  border-color: #3b82f6;
+  color: #e2e8f0;
+}
+
+.country-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.country-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-align: left;
+}
+
+.country-chip img {
+  height: 16px;
+  width: auto;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.country-chip.active {
+  border-color: #3b82f6;
+  color: #e2e8f0;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.country-chip:hover {
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+.country-chip.active:hover {
+  border-color: #60a5fa;
+}
+
 /* ── Mobile ── */
 
 @media (max-width: 640px) {

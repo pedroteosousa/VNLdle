@@ -47,6 +47,14 @@ async function loadPlayers(year: Year): Promise<Player[]> {
   return mod.default
 }
 
+async function loadFlags(year: Year): Promise<Record<string, string>> {
+  const key = `../data/${year}_flags.json`
+  const loader = dataModules[key]
+  if (!loader) return {}
+  const mod = (await loader()) as { default: Record<string, string> }
+  return mod.default
+}
+
 function hashInt(n: number): number {
   n = Math.imul(n ^ (n >>> 16), 0x45d9f3b)
   n = Math.imul(n ^ (n >>> 16), 0x45d9f3b)
@@ -59,8 +67,10 @@ function getDailyTarget(players: Player[], year: Year): Player {
   return players[index]
 }
 
-function getRandomTarget(players: Player[]): Player {
-  return players[Math.floor(Math.random() * players.length)]
+function getRandomTarget(players: Player[], enabledTeams: Set<string>): Player {
+  const pool = players.filter(p => enabledTeams.has(p.team))
+  const source = pool.length > 0 ? pool : players
+  return source[Math.floor(Math.random() * source.length)]
 }
 
 function parseHeight(h: string): number {
@@ -179,6 +189,9 @@ export default function App() {
   const [year, setYear] = useState<Year>('2026')
   const [mode, setMode] = useState<Mode>('endless')
   const [players, setPlayers] = useState<Player[]>([])
+  const [flags, setFlags] = useState<Record<string, string>>({})
+  const [enabledTeams, setEnabledTeams] = useState<Set<string>>(new Set())
+  const [showCountryFilter, setShowCountryFilter] = useState(false)
   const [target, setTarget] = useState<Player | null>(null)
   const [guesses, setGuesses] = useState<GuessResult[]>([])
   const [query, setQuery] = useState('')
@@ -194,12 +207,16 @@ export default function App() {
     setQuery('')
 
     loadPlayers(year)
-      .then(p => {
+      .then(async p => {
         if (cancelled) return
-        const t = mode === 'daily' ? getDailyTarget(p, year) : getRandomTarget(p)
+        const f = await loadFlags(year)
+        const allTeams = new Set(p.map(pl => pl.team))
+        const t = mode === 'daily' ? getDailyTarget(p, year) : null
         setPlayers(p)
+        setFlags(f)
+        setEnabledTeams(allTeams)
         setTarget(t)
-        setGuesses(mode === 'daily' ? loadDailyGuesses(year, p, t) : [])
+        setGuesses(mode === 'daily' ? loadDailyGuesses(year, p, t!) : [])
         setLoading(false)
       })
       .catch(() => {
@@ -210,6 +227,8 @@ export default function App() {
 
     return () => { cancelled = true }
   }, [year, mode])
+
+  const allTeams = [...new Set(players.map(p => p.team))].sort()
 
   const won = target ? guesses.some(g => g.player.name === target.name) : false
   const guessedNames = new Set(guesses.map(g => g.player.name))
@@ -227,8 +246,13 @@ export default function App() {
       : []
 
   function submitGuess(player: Player) {
-    if (!target || guessedNames.has(player.name) || won) return
-    const newGuesses = [evaluateGuess(player, target), ...guesses]
+    if (guessedNames.has(player.name) || won) return
+    const resolvedTarget = target ?? getRandomTarget(players, enabledTeams)
+    if (resolvedTarget !== target) {
+      setTarget(resolvedTarget)
+      setShowCountryFilter(false)
+    }
+    const newGuesses = [evaluateGuess(player, resolvedTarget), ...guesses]
     setGuesses(newGuesses)
     if (mode === 'daily') saveDailyGuesses(year, newGuesses)
     setQuery('')
@@ -243,8 +267,17 @@ export default function App() {
   function nextPlayer() {
     setGuesses([])
     setQuery('')
-    setTarget(getRandomTarget(players))
+    setTarget(null)
     setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  function toggleTeam(team: string) {
+    setEnabledTeams(prev => {
+      const next = new Set(prev)
+      if (next.has(team)) next.delete(team)
+      else next.add(team)
+      return next
+    })
   }
 
   return (
@@ -288,6 +321,41 @@ export default function App() {
         </div>
       </div>
 
+      {mode === 'endless' && !loading && !error && (
+        <div className="country-filter">
+          <button
+            className="country-toggle"
+            onClick={() => setShowCountryFilter(v => !v)}
+          >
+            Countries ({enabledTeams.size}/{allTeams.length}) {showCountryFilter ? '▲' : '▼'}
+          </button>
+          {showCountryFilter && (
+            <div className="country-panel">
+              {guesses.length > 0 && (
+                <p className="country-locked-msg">Countries are locked for the current game.</p>
+              )}
+              <div className="country-actions">
+                <button disabled={guesses.length > 0} onClick={() => setEnabledTeams(new Set(allTeams))}>Enable all</button>
+                <button disabled={guesses.length > 0} onClick={() => setEnabledTeams(new Set())}>Disable all</button>
+              </div>
+              <div className="country-grid">
+                {allTeams.map(team => (
+                  <button
+                    key={team}
+                    className={`country-chip ${enabledTeams.has(team) ? 'active' : ''}`}
+                    onClick={() => toggleTeam(team)}
+                    disabled={guesses.length > 0}
+                  >
+                    {flags[team] && <img src={flags[team]} alt="" />}
+                    {team}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <p className="status-msg">Loading players…</p>
       ) : error ? (
@@ -300,9 +368,10 @@ export default function App() {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Type a player name…"
+                  placeholder={mode === 'endless' && enabledTeams.size === 0 ? 'Select at least one country…' : 'Type a player name…'}
                   value={query}
                   autoComplete="off"
+                  disabled={mode === 'endless' && enabledTeams.size === 0}
                   onChange={e => {
                     setQuery(e.target.value)
                     setShowSuggestions(true)
