@@ -152,6 +152,21 @@ const availableYears = new Set(
   Object.keys(dataModules).map(k => k.match(/(\d{4})\.json$/)?.[1]).filter(Boolean)
 )
 
+function saveEnabledTeams(year: Year, teams: Set<string>): void {
+  localStorage.setItem(`vnldle-teams-${year}`, JSON.stringify([...teams]))
+}
+
+function loadEnabledTeams(year: Year, allTeams: string[]): Set<string> {
+  try {
+    const saved = localStorage.getItem(`vnldle-teams-${year}`)
+    if (!saved) return new Set(allTeams)
+    const names: string[] = JSON.parse(saved)
+    return new Set(names.filter(t => allTeams.includes(t)))
+  } catch {
+    return new Set(allTeams)
+  }
+}
+
 function getDailyStorageKey(year: Year): string {
   const d = new Date()
   const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -210,7 +225,8 @@ export default function App() {
       .then(async p => {
         if (cancelled) return
         const f = await loadFlags(year)
-        const allTeams = new Set(p.map(pl => pl.team))
+        const allTeamsArr = [...new Set(p.map(pl => pl.team))].sort()
+        const allTeams = loadEnabledTeams(year, allTeamsArr)
         const t = mode === 'daily' ? getDailyTarget(p, year) : null
         setPlayers(p)
         setFlags(f)
@@ -230,6 +246,10 @@ export default function App() {
 
   const allTeams = [...new Set(players.map(p => p.team))].sort()
 
+  useEffect(() => {
+    if (players.length > 0) saveEnabledTeams(year, enabledTeams)
+  }, [enabledTeams, year, players.length])
+
   const won = target ? guesses.some(g => g.player.name === target.name) : false
   const guessedNames = new Set(guesses.map(g => g.player.name))
 
@@ -237,10 +257,10 @@ export default function App() {
   const suggestions =
     query.length > 0
       ? players
-          .filter(
-            p =>
-              !guessedNames.has(p.name) &&
-              (p.name.toLowerCase().includes(q) || p.nickname.toLowerCase().includes(q))
+          .filter(p =>
+            !guessedNames.has(p.name) &&
+            (p.name.toLowerCase().includes(q) || p.nickname.toLowerCase().includes(q)) &&
+            (mode === 'daily' || target !== null || enabledTeams.has(p.team))
           )
           .slice(0, 8)
       : []
